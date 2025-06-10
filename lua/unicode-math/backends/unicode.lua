@@ -63,6 +63,15 @@ local unicode_map = {
         T = '𝕋', U = '𝕌', V = '𝕍', W = '𝕎', X = '𝕏', Y = '𝕐'
     },
     
+    mathbf = { -- For \mathbf{} commands (Unicode Mathematical Bold)
+        A = '𝐀', B = '𝐁', C = '𝐂', D = '𝐃', E = '𝐄', F = '𝐅', G = '𝐆', H = '𝐇', I = '𝐈', J = '𝐉',
+        K = '𝐊', L = '𝐋', M = '𝐌', N = '𝐍', O = '𝐎', P = '𝐏', Q = '𝐐', R = '𝐑', S = '𝐒', T = '𝐓',
+        U = '𝐔', V = '𝐕', W = '𝐖', X = '𝐗', Y = '𝐘', Z = '𝐙',
+        a = '𝐚', b = '𝐛', c = '𝐜', d = '𝐝', e = '𝐞', f = '𝐟', g = '𝐠', h = '𝐡', i = '𝐢', j = '𝐣',
+        k = '𝐤', l = '𝐥', m = '𝐦', n = '𝐧', o = '𝐨', p = '𝐩', q = '𝐪', r = '𝐫', s = '𝐬', t = '𝐭',
+        u = '𝐮', v = '𝐯', w = '𝐰', x = '𝐱', y = '𝐲', z = '𝐳'
+    },
+    
     -- Fractions
     frac12 = '½', frac13 = '⅓', frac23 = '⅔', frac14 = '¼', frac34 = '¾',
     frac15 = '⅕', frac25 = '⅖', frac35 = '⅗', frac45 = '⅘',
@@ -95,6 +104,29 @@ function M.convert_to_unicode(latex)
         end
         -- For multi-character unknown strings, just return them as-is
         return '\\mathbb{' .. letter .. '}'
+    end)
+    
+    -- Handle \mathbf{} commands
+    result = result:gsub('\\mathbf{([^}]+)}', function(content)
+        local bold_result = ""
+        for i = 1, #content do
+            local char = content:sub(i, i)
+            if unicode_map.mathbf and unicode_map.mathbf[char] then
+                bold_result = bold_result .. unicode_map.mathbf[char]
+            else
+                bold_result = bold_result .. char
+            end
+        end
+        return bold_result
+    end)
+    
+    -- Handle \mathbf without braces (single character)
+    result = result:gsub('\\mathbf([A-Za-z])', function(char)
+        if unicode_map.mathbf and unicode_map.mathbf[char] then
+            return unicode_map.mathbf[char]
+        else
+            return char
+        end
     end)
     
     -- Handle special LaTeX constructs
@@ -145,9 +177,9 @@ function M.convert_to_unicode(latex)
     result = result:gsub('\\sum_{([^}]+)}', '∑[%1]')
     result = result:gsub('\\prod_{([^}]+)}', '∏[%1]')
     
-    -- Replace backslash commands with unicode FIRST
+    -- Replace backslash commands with unicode FIRST (but skip mathbf and mathbb)
     for cmd, symbol in pairs(unicode_map) do
-        if type(symbol) == 'string' then
+        if type(symbol) == 'string' and cmd ~= 'mathbf' and cmd ~= 'mathbb' then
             -- Handle commands that might be followed by non-word characters or at end of string
             result = result:gsub('\\' .. cmd .. '([^%w])', symbol .. '%1')
             result = result:gsub('\\' .. cmd .. '$', symbol)
@@ -171,12 +203,12 @@ function M.convert_to_unicode(latex)
     result = result:gsub('\\log([^%w])', 'log%1')
     result = result:gsub('\\ln([^%w])', 'ln%1')
     
-    -- Enhanced superscripts and subscripts with braces (handle Unicode characters)
-    result = result:gsub('([%w%pα-ωΑ-Ω])%^{([^}]+)}', function(base, exp)
+    -- Enhanced superscripts and subscripts with braces (handle Unicode characters including bold math)
+    result = result:gsub('([%w%p%sα-ωΑ-Ω𝐀-𝐳])%^{([^}]+)}', function(base, exp)
         return base .. M.to_superscript(exp)
     end)
     
-    result = result:gsub('([%w%pα-ωΑ-Ω])_{([^}]+)}', function(base, sub)
+    result = result:gsub('([%w%p%sα-ωΑ-Ω𝐀-𝐳])_{([^}]+)}', function(base, sub)
         return base .. M.to_subscript(sub)
     end)
     
@@ -203,12 +235,12 @@ function M.convert_to_unicode(latex)
         return base .. M.to_superscript(exp)
     end)
     
-    -- Simple superscripts and subscripts (ASCII and Unicode characters)
-    result = result:gsub('([%w%pα-ωΑ-Ω])%^([%w])', function(base, exp)
+    -- Simple superscripts and subscripts (ASCII and Unicode characters including bold math)
+    result = result:gsub('([%w%pα-ωΑ-Ω𝐀-𝐳])%^([%w])', function(base, exp)
         return base .. M.to_superscript(exp)
     end)
     
-    result = result:gsub('([%w%pα-ωΑ-Ω])_([%w])', function(base, sub)
+    result = result:gsub('([%w%pα-ωΑ-Ω𝐀-𝐳])_([%w])', function(base, sub)
         return base .. M.to_subscript(sub)
     end)
     
@@ -232,6 +264,18 @@ function M.convert_to_unicode(latex)
     result = result:gsub('e%^{([^}]+)}', function(exp)
         return 'e^' .. M.to_superscript(exp)
     end)
+    
+    -- Handle \left and \right bracket commands
+    result = result:gsub('\\left%[', '[')
+    result = result:gsub('\\right%]', ']')
+    result = result:gsub('\\left%(', '(')
+    result = result:gsub('\\right%)', ')')
+    result = result:gsub('\\left%{', '{')
+    result = result:gsub('\\right%}', '}')
+    result = result:gsub('\\left|', '|')
+    result = result:gsub('\\right|', '|')
+    result = result:gsub('\\left%.', '')  -- \left. (invisible)
+    result = result:gsub('\\right%.', '') -- \right. (invisible)
     
     -- Clean up any remaining braces for simple cases (but preserve complex expressions)
     -- Handle empty braces first

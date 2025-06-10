@@ -117,20 +117,20 @@ end
 function M.process_line(line)
     local new_line = line
     
+    -- Find and replace display math first: $$...$$
+    new_line = new_line:gsub('%$%$([^%$]+)%$%$', function(math)
+        if math and math ~= "" then
+            return M.render(math, true)
+        end
+        return '$$' .. math .. '$$'
+    end)
+    
     -- Find and replace inline math: $...$
     new_line = new_line:gsub('%$([^%$]+)%$', function(math)
         if math and math ~= "" then
             return M.render(math)
         end
         return '$' .. math .. '$'
-    end)
-    
-    -- Find and replace display math: $$...$$
-    new_line = new_line:gsub('%$%$([^%$]+)%$%$', function(math)
-        if math and math ~= "" then
-            return M.render(math, true)
-        end
-        return '$$' .. math .. '$$'
     end)
     
     return new_line
